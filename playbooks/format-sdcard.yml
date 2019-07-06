@@ -1,0 +1,66 @@
+---
+
+- hosts: localhost
+  connection: local
+  tasks:
+    - name: Check device
+      import_tasks: includes/device.yml
+
+    - name: Ensure required packages are installed
+      become: yes
+      pacman:
+        name:
+          - parted
+          - dosfstools
+          - rsync
+        state: present
+
+    - name: Remove all partitions
+      become: yes
+      parted:
+        device: "{{ device }}"
+        number: "{{ item.num }}"
+        state: absent
+      loop: "{{ device_info.partitions }}"
+
+    - name: Ensure boot partition
+      become: yes
+      parted:
+        device: "{{ device }}"
+        number: 1
+        part_end: 200MB
+        state: present
+        flags:
+          - lba
+
+    - name: Ensure root partition
+      become: yes
+      parted:
+        device: "{{ device }}"
+        number: 2
+        part_start: 200MB
+        part_end: "{{ device_info.disk.size - temp_root_gb }}GB"
+        state: present
+
+    - name: Ensure temporary root partition
+      become: yes
+      parted:
+        device: "{{ device }}"
+        number: 3
+        part_start: "{{ device_info.disk.size - temp_root_gb }}GB"
+        state: present
+
+    - name: Filesystem on boot partition
+      become: yes
+      filesystem:
+        fstype: vfat
+        dev: "{{ device }}1"
+        opts: -F 32
+        force: yes
+
+    - name: Filesystem on temporary root partition
+      become: yes
+      filesystem:
+        fstype: ext4
+        dev: "{{ device }}3"
+        force: yes

@@ -1,0 +1,3 @@
+localhost
+
+archpi ansible_user=alarm

@@ -1,0 +1,49 @@
+---
+
+- hosts: localhost
+  connection: local
+  tasks:
+    - name: Check device
+      import_tasks: includes/device.yml
+
+    - name: Fetch checksum of latest image
+      uri:
+        url: http://de6.mirror.archlinuxarm.org/os/ArchLinuxARM-rpi-2-latest.tar.gz.md5
+        return_content: yes
+      register: checksum
+
+    - name: Extract checksum
+      set_fact:
+        latest_md5: "{{ checksum.content.split(' ')|first }}"
+
+    - name: Ensure working directory exists
+      file:
+        path: "{{ working_dir }}"
+        state: directory
+
+    - name: Check existing image
+      stat:
+        path: "{{ image_path }}"
+        get_checksum: yes
+        checksum_algorithm: md5
+      register: stat
+
+    - name: Download newer image
+      get_url:
+        url: http://de6.mirror.archlinuxarm.org/os/ArchLinuxARM-rpi-2-latest.tar.gz
+        dest: "{{ image_path }}"
+        checksum: "md5:{{ latest_md5 }}"
+      when: not stat.stat.exists or stat.stat.checksum != latest_md5
+
+    - name: Mount
+      import_tasks: includes/mount.yml
+
+    - name: Extract image
+      become: yes
+      unarchive:
+        src: "{{ image_path }}"
+        dest: "{{ working_dir }}/root/"
+        remote_src: yes
+
+    - name: Unmount
+      import_tasks: includes/unmount.yml

@@ -1,0 +1,19 @@
+---
+
+- name: Mount root partition
+  become: yes
+  mount:
+    path: "{{ working_dir }}/root"
+    src: "{{ device }}3"
+    state: mounted
+    fstype: ext4
+    fstab: "{{ working_dir }}/fake-fstab"
+
+- name: Mount boot partition
+  become: yes
+  mount:
+    path: "{{ working_dir }}/root/boot"
+    src: "{{ device }}1"
+    state: mounted
+    fstype: vfat
+    fstab: "{{ working_dir }}/fake-fstab"

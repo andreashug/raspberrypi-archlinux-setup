@@ -1,0 +1,70 @@
+---
+
+- hosts: archpi
+  gather_facts: no
+  become: yes
+  become_method: su
+  tasks:
+    - name: Init pacman key
+      raw: pacman-key --init
+
+    - name: Populate archlinuxarm key
+      raw: pacman-key --populate archlinuxarm
+
+    - name: Upgrade system
+      raw: pacman -Syu --noconfirm
+
+    - name: Install python
+      raw: pacman -S --noconfirm python
+
+- hosts: archpi
+  become: yes
+  become_method: su
+  tasks:
+    - name: Install required packages
+      pacman:
+        name:
+          - mkinitcpio-utils
+          - mkinitcpio-netconf
+          - mkinitcpio-dropbear
+
+    - name: Copy SSH public key
+      copy:
+        src: "{{ ssh_pub_key }}"
+        dest: "/etc/dropbear/root_key"
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Backup boot files
+      copy:
+        src: "/boot/{{ item }}"
+        dest: "/boot/{{ item }}.backup"
+        remote_src: yes
+        force: no
+      loop:
+        - initramfs-linux.img
+        - cmdline.txt
+        - config.txt
+
+    - name: Modify mkinitcpio.conf
+      lineinfile:
+        path: /etc/mkinitcpio.conf
+        regex: "^HOOKS="
+        line: HOOKS=(base udev autodetect modconf block sleep netconf dropbear encryptssh filesystems keyboard fsck)
+
+    - name: Modify boot parameters
+      replace:
+        path: /boot/cmdline.txt
+        regexp: "^root=/dev/\\w+"
+        replace: "ip=::::{{ ansible_hostname }}:eth0:dhcp root=/dev/mapper/cryptroot cryptdevice=/dev/mmcblk0p2:cryptroot rootfstype=ext4"
+        backup: no
+
+    - name: Modify fstab
+      lineinfile:
+        path: /etc/fstab
+        regex: "^/dev/mapper/cryptroot"
+        line: "/dev/mapper/cryptroot  /     ext4    defaults,noatime 0 1"
+
+    - name: Run mkinitcpio
+      command: mkinitcpio -p linux-raspberrypi

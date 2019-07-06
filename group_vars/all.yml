@@ -1,0 +1,7 @@
+---
+
+hostname: archpi
+working_dir: /tmp/raspberry
+image_path: "{{ working_dir }}/ArchLinuxARM-rpi-2-latest.tar.gz"
+temp_root_gb: 3
+ssh_pub_key: ~/.ssh/id_rsa.pub

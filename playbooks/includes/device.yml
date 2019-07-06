@@ -1,0 +1,23 @@
+---
+
+- name: Require device set
+  fail:
+    msg: Device not set. Set with '-e device=/dev/sdX'
+  when: device is undefined
+
+- name: Read device information
+  become: yes
+  parted:
+    device: "{{ device }}"
+    unit: GB
+  register: device_info
+
+- name: Prompt confirmation
+  pause:
+    prompt: "Are you sure to proceed with {{ device }} {{ device_info.disk.model }}? Type 'yes'"
+  register: prompt_input
+
+- name: Fail if not confirmed
+  fail:
+    msg: "Expected 'yes', received '{{ prompt_input.user_input }}'"
+  when: prompt_input.user_input != 'yes'

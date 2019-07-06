@@ -1,0 +1,56 @@
+- hosts: localhost
+  connection: local
+  tasks:
+    - name: Check device
+      import_tasks: includes/device.yml
+
+    - name: Encrypt root partition
+      pause:
+        prompt: "Please execute the following command and press <enter> when done: sudo cryptsetup luksFormat --pbkdf pbkdf2 {{ device }}2"
+
+    - name: Open root partition
+      pause:
+        prompt: "Please execute the following command and press <enter> when done: sudo cryptsetup open {{ device }}2 archpicryptroot"
+
+    - name: Filesystem on encrypted root partition
+      become: yes
+      filesystem:
+        fstype: ext4
+        dev: /dev/mapper/archpicryptroot
+
+    - name: Mount root partition
+      become: yes
+      mount:
+        path: "{{ working_dir }}/root"
+        src: "{{ device }}3"
+        state: mounted
+        fstype: ext4
+        fstab: "{{ working_dir }}/fake-fstab"
+
+    - name: Mount encrypted root partition
+      become: yes
+      mount:
+        path: "{{ working_dir }}/archpicryptroot"
+        src: "/dev/mapper/archpicryptroot"
+        state: mounted
+        fstype: ext4
+        fstab: "{{ working_dir }}/fake-fstab"
+
+    - name: Copy files from root to encrypted root
+      become: yes
+      synchronize:
+        src: "{{ working_dir }}/root/"
+        dest: "{{ working_dir }}/archpicryptroot"
+
+    - name: Umount
+      become: yes
+      mount:
+        path: "{{ working_dir }}{{ item }}"
+        state: unmounted
+      loop:
+        - /archpicryptroot
+        - /root
+
+    - name: Close root partition
+      become: yes
+      command: cryptsetup close archpicryptroot

@@ -1,0 +1,10 @@
+---
+
+- name: Umount
+  become: yes
+  mount:
+    path: "{{ working_dir }}{{ item }}"
+    state: unmounted
+  loop:
+    - /root/boot
+    - /root

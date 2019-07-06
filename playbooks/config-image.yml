@@ -1,0 +1,74 @@
+---
+
+- hosts: localhost
+  connection: local
+  tasks:
+    - name: Check device
+      import_tasks: includes/device.yml
+
+    - name: Mount
+      import_tasks: includes/mount.yml
+
+    - name: Let device boot from temporary root
+      become: yes
+      replace:
+        path: "{{ working_dir }}/root/boot/cmdline.txt"
+        regexp: /dev/mmcblk0p2
+        replace: /dev/mmcblk0p3
+        backup: no
+
+    - name: Set hostname
+      become: yes
+      copy:
+        content: "{{ hostname }}"
+        dest: "{{ working_dir }}/root/etc/hostname"
+        owner: root
+        group: root
+        mode: 0644
+
+    - name: Ensure SSH directory exists
+      become: yes
+      file:
+        path: "{{ working_dir }}/root/home/alarm/.ssh/"
+        state: directory
+        owner: 1000
+        group: 1000
+        mode: 0750
+
+    - name: Copy SSH public key
+      become: yes
+      copy:
+        src: "{{ ssh_pub_key }}"
+        dest: "{{ working_dir }}/root/home/alarm/.ssh/authorized_keys"
+        owner: 1000
+        group: 1000
+        mode: 0640
+
+    - name: Disable SSH access with password
+      become: yes
+      lineinfile:
+        path: "{{ working_dir }}/root/etc/ssh/sshd_config"
+        regexp: "^#?PasswordAuthentication"
+        line: "PasswordAuthentication no"
+
+    - name: Remove existing SSH host keys
+      become: yes
+      file:
+        path: "{{ working_dir }}/root/etc/ssh/{{ item }}"
+        state: absent
+      loop:
+        - ssh_host_rsa_key
+        - ssh_host_rsa_key.pub
+        - ssh_host_dsa_key
+        - ssh_host_dsa_key.pub
+        - ssh_host_ecdsa_key
+        - ssh_host_ecdsa_key.pub
+        - ssh_host_ed25519_key
+        - ssh_host_ed25519_key.pub
+
+    - name: Genrate SSH host keys in PEM format
+      become: yes
+      command: "ssh-keygen -A -m PEM -f {{ working_dir }}/root"
+
+    - name: Unmount
+      import_tasks: includes/unmount.yml
